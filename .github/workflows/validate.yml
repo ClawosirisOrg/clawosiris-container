@@ -1,0 +1,41 @@
+name: Validate Container Build
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout orchestration repo
+        uses: actions/checkout@v4
+
+      - name: Checkout OpenClaw source
+        uses: actions/checkout@v4
+        with:
+          repository: clawosiris/openclaw
+          ref: main
+          path: openclaw
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build validation image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./openclaw
+          file: ./openclaw/Dockerfile
+          push: false
+          load: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            OPENCLAW_INSTALL_BROWSER=true
+            OPENCLAW_DOCKER_APT_PACKAGES=android-tools-adb usbutils ssh build-essential sudo
+            OPENCLAW_EXTENSIONS=acpx,active-memory,arcee,brave,browser,codex,document-extract,file-transfer,media-understanding-core,memory-core,signal,thread-ownership,whatsapp
