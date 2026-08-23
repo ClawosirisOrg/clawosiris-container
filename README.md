@@ -36,4 +36,6 @@ Run the `Release OpenClaw Container` workflow with:
 - `version_tag`
 - optional overrides for browser install, apt packages, extensions, and `latest`
 
+When publishing to an existing package not connected to this workflow repository, add a package-capable PAT as the `GHCR_TOKEN` repository secret. The workflow prefers `GHCR_TOKEN` and falls back to `GITHUB_TOKEN` when it is absent.
+
 The workflow always produces a version tag and a commit-SHA tag. If `latest=true`, it also publishes `:latest`.
