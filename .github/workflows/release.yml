@@ -25,7 +25,7 @@ on:
       openclaw_docker_apt_packages:
         description: Space-delimited apt packages
         required: true
-        default: android-tools-adb usbutils ssh build-essential sudo
+        default: android-tools-adb usbutils ssh build-essential sudo gh
         type: string
       openclaw_extensions:
         description: Comma-delimited extension list

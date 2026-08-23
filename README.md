@@ -17,7 +17,7 @@ Published images target:
 ## Default build arguments
 
 - `OPENCLAW_INSTALL_BROWSER=true`
-- `OPENCLAW_DOCKER_APT_PACKAGES="android-tools-adb usbutils ssh build-essential sudo"`
+- `OPENCLAW_DOCKER_APT_PACKAGES="android-tools-adb usbutils ssh build-essential sudo gh"`
 - `OPENCLAW_EXTENSIONS="acpx,active-memory,arcee,brave,browser,codex,document-extract,file-transfer,media-understanding-core,memory-core,signal,thread-ownership,whatsapp"`
 
 ## Workflows
