@@ -19,7 +19,7 @@ jobs:
       - name: Checkout OpenClaw source
         uses: actions/checkout@v4
         with:
-          repository: clawosiris/openclaw
+          repository: ClawosirisOrg/openclaw
           ref: main
           path: openclaw
 
@@ -38,4 +38,4 @@ jobs:
           build-args: |
             OPENCLAW_INSTALL_BROWSER=true
             OPENCLAW_DOCKER_APT_PACKAGES=android-tools-adb usbutils ssh build-essential sudo gh
-            OPENCLAW_EXTENSIONS=acpx,active-memory,arcee,brave,browser,codex,document-extract,file-transfer,media-understanding-core,memory-core,signal,thread-ownership,whatsapp
+            OPENCLAW_EXTENSIONS=acpx,active-memory,arcee,brave,browser,codex,document-extract,file-transfer,memory-core,signal,whatsapp
