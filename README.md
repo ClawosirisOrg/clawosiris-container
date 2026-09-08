@@ -38,6 +38,12 @@ Homebrew's `bin` and `sbin` directories are appended to `PATH`. Debian and `/usr
 
 Both workflows run `scripts/prepare-dockerfile.sh` after checking out OpenClaw. The script appends the tracked `docker/homebrew.Dockerfile` layer to the selected upstream Dockerfile and writes `openclaw/Dockerfile.clawosiris`, which is the file passed to Buildx.
 
+## Codex CLI
+
+The selected OpenClaw Codex extension already includes its lockfile-pinned `@openai/codex` package. The runtime overlay exposes only that bundled CLI as `/usr/local/bin/codex`; it does not install or pin a second Codex copy. Consequently, the CLI version follows the Codex extension and OpenClaw lockfile whenever the image is rebuilt.
+
+Codex authentication remains runtime state. Credentials, API keys, access tokens, and login automation are not included in the image.
+
 ## Persistent Homebrew Quadlet volume
 
 The files under `quadlet/` extend an existing rootless `openclaw.container` unit without replacing it. Install them for the user that runs OpenClaw:
