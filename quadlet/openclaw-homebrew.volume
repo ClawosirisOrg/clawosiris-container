@@ -1,0 +1,5 @@
+[Unit]
+Description=Persistent Homebrew prefix for OpenClaw
+
+[Volume]
+VolumeName=openclaw-homebrew

@@ -30,6 +30,31 @@ Debian Bookworm's ImageMagick 6 provides `convert`-style tools, but it is not a 
 
 The following tools are intentionally not treated as native-equivalent in Bookworm: Go (Bookworm 1.19 is materially older than the current toolchain), `yt-dlp` (the Bookworm package is from 2023), `himalaya`, `gog`, `summarize`, `gifgrep`, `tectonic`, `uv`, Deno, and `signal-cli`.
 
+## Homebrew layer
+
+The image includes only the Homebrew package manager, installed at the standard Linux prefix `/home/linuxbrew/.linuxbrew`. The build pins Homebrew to commit `9e9f316db6990631c097d48a792caf8645a4129e` (Homebrew 6.0.14), disables analytics, and leaves the entire prefix writable by the runtime `node` user. No formulae are preinstalled.
+
+Homebrew's `bin` and `sbin` directories are appended to `PATH`. Debian and `/usr/local` executables therefore keep precedence, while Homebrew-installed commands fill gaps in the native tool set.
+
+Both workflows run `scripts/prepare-dockerfile.sh` after checking out OpenClaw. The script appends the tracked `docker/homebrew.Dockerfile` layer to the selected upstream Dockerfile and writes `openclaw/Dockerfile.clawosiris`, which is the file passed to Buildx.
+
+## Persistent Homebrew Quadlet volume
+
+The files under `quadlet/` extend an existing rootless `openclaw.container` unit without replacing it. Install them for the user that runs OpenClaw:
+
+```sh
+mkdir -p ~/.config/containers/systemd/openclaw.container.d
+cp quadlet/openclaw-homebrew.volume ~/.config/containers/systemd/
+cp quadlet/openclaw.container.d/10-homebrew-volume.conf \
+  ~/.config/containers/systemd/openclaw.container.d/
+systemctl --user daemon-reload
+systemctl --user restart openclaw.service
+```
+
+The drop-in references `openclaw-homebrew.volume` directly, so Quadlet creates the named volume and orders the generated services correctly. It mounts the volume at `/home/linuxbrew/.linuxbrew`. The mount deliberately does not use `nocopy`: on its first use, Podman's default copy-up seeds an empty volume with the pinned Homebrew installation and ownership from the image. Formulae installed later with `brew install` remain in that volume across container recreation and image upgrades.
+
+An existing volume also keeps its current Homebrew checkout when the image changes. Upgrade that persistent installation explicitly with `brew update` and upgrade formulae when desired with `brew upgrade`; the container does not run either command at startup. To adopt a newer image seed instead, stop `openclaw.service`, run `podman volume rm openclaw-homebrew`, and start the service again. Removing the volume permanently removes every formula and other on-demand change in it; the next first mount reseeds only the Homebrew package manager from the image.
+
 ## Workflows
 
 - `validate.yml`

@@ -23,6 +23,9 @@ jobs:
           ref: main
           path: openclaw
 
+      - name: Prepare Clawosiris Dockerfile
+        run: ./scripts/prepare-dockerfile.sh ./openclaw/Dockerfile ./openclaw/Dockerfile.clawosiris
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -30,7 +33,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: ./openclaw
-          file: ./openclaw/Dockerfile
+          file: ./openclaw/Dockerfile.clawosiris
           push: false
           load: false
           cache-from: type=gha
