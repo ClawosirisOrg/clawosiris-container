@@ -18,7 +18,7 @@ Published images target:
 
 - `OPENCLAW_INSTALL_BROWSER=true`
 - `OPENCLAW_DOCKER_APT_PACKAGES="android-tools-adb build-essential ffmpeg fontconfig gh ghostscript imagemagick jq pandoc pipx ripgrep rsync ssh sudo tesseract-ocr texlive-latex-base time tmux usbutils weasyprint xsltproc"`
-- `OPENCLAW_EXTENSIONS="acpx,active-memory,arcee,brave,browser,codex,document-extract,file-transfer,memory-core,signal,whatsapp"`
+- `OPENCLAW_EXTENSIONS="acpx,active-memory,arcee,brave,browser,codex,document-extract,file-transfer,llama-cpp,matrix,memory-core,signal,whatsapp"`
 
 The default Debian packages provide native coverage for:
 
