@@ -34,13 +34,13 @@ The following tools are intentionally not treated as native-equivalent in Bookwo
 
 The image includes only the Homebrew package manager, installed at the standard Linux prefix `/home/linuxbrew/.linuxbrew`. The build pins Homebrew to commit `9e9f316db6990631c097d48a792caf8645a4129e` (Homebrew 6.0.14), disables analytics, and leaves the entire prefix writable by the runtime `node` user. No formulae are preinstalled.
 
-Homebrew's `bin` and `sbin` directories are appended to `PATH`. Debian and `/usr/local` executables therefore keep precedence, while Homebrew-installed commands fill gaps in the native tool set.
+The app-local pnpm binary directory and Homebrew's `bin` and `sbin` directories are appended to `PATH`, in that order. Debian and `/usr/local` executables therefore keep precedence, pnpm-installed apps from `/app/node_modules/.bin` are available to the runtime `node` user, and Homebrew-installed commands fill remaining gaps in the native tool set.
 
 Both workflows run `scripts/prepare-dockerfile.sh` after checking out OpenClaw. The script appends the tracked `docker/homebrew.Dockerfile` layer to the selected upstream Dockerfile and writes `openclaw/Dockerfile.clawosiris`, which is the file passed to Buildx.
 
 ## Codex CLI
 
-The selected OpenClaw Codex extension already includes its lockfile-pinned `@openai/codex` package. The runtime overlay exposes only that bundled CLI as `/usr/local/bin/codex`; it does not install or pin a second Codex copy. Consequently, the CLI version follows the Codex extension and OpenClaw lockfile whenever the image is rebuilt.
+The selected OpenClaw Codex extension already includes its lockfile-pinned `@openai/codex` package. The runtime overlay exposes its CLI, along with other executables from the production pnpm install, through `/app/node_modules/.bin` on `PATH`; it does not install or pin a second Codex copy. Consequently, the CLI version follows the Codex extension and OpenClaw lockfile whenever the image is rebuilt.
 
 Codex authentication remains runtime state. Credentials, API keys, access tokens, and login automation are not included in the image.
 
