@@ -30,7 +30,7 @@ on:
       openclaw_extensions:
         description: Comma-delimited extension list
         required: true
-        default: acpx,active-memory,arcee,brave,browser,codex,document-extract,file-transfer,memory-core,signal,whatsapp
+        default: acpx,active-memory,arcee,brave,browser,codex,document-extract,file-transfer,llama-cpp,matrix,memory-core,signal,whatsapp
         type: string
 
 permissions:
