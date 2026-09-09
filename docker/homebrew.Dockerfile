@@ -4,7 +4,7 @@ USER root
 
 ENV HOMEBREW_PREFIX=/home/linuxbrew/.linuxbrew \
     HOMEBREW_NO_ANALYTICS=1 \
-    PATH="${PATH}:/app/node_modules/.bin:/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin"
+    PATH="${PATH}:/home/node/.npm-global/bin:/app/node_modules/.bin:/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin"
 
 RUN install -d -m 0755 "$HOMEBREW_PREFIX/Homebrew" && \
     git init "$HOMEBREW_PREFIX/Homebrew" && \
@@ -20,7 +20,8 @@ RUN install -d -m 0755 "$HOMEBREW_PREFIX/Homebrew" && \
     chown -R node:node "$HOMEBREW_PREFIX"
 
 USER node
-RUN brew --version && \
+RUN printf '%s\n' "$PATH" | tr ':' '\n' | grep -Fx /home/node/.npm-global/bin && \
+    brew --version && \
     test "$(brew --prefix)" = "$HOMEBREW_PREFIX" && \
     touch "$HOMEBREW_PREFIX/.write-test" && \
     rm "$HOMEBREW_PREFIX/.write-test" && \
