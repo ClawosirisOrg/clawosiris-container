@@ -17,12 +17,12 @@ Published images target:
 ## Default build arguments
 
 - `OPENCLAW_INSTALL_BROWSER=true`
-- `OPENCLAW_DOCKER_APT_PACKAGES="android-tools-adb build-essential ffmpeg fontconfig gh ghostscript imagemagick jq pandoc pipx ripgrep rsync ssh sudo tesseract-ocr texlive-latex-base time tmux usbutils weasyprint xsltproc"`
+- `OPENCLAW_DOCKER_APT_PACKAGES="android-tools-adb build-essential ffmpeg fontconfig gh ghostscript imagemagick jq pandoc pipx podman-remote ripgrep rsync ssh sudo tesseract-ocr texlive-latex-base time tmux usbutils weasyprint xsltproc"`
 - `OPENCLAW_EXTENSIONS="acpx,active-memory,arcee,brave,browser,codex,document-extract,file-transfer,llama-cpp,matrix,memory-core,signal,whatsapp"`
 
 The default Debian packages provide native coverage for:
 
-- agent and CLI tools: GitHub CLI, `jq`, `pipx`, ripgrep, `rsync`, `time`, and `tmux`, plus the existing build, SSH, Android, USB, and privilege-management tools
+- agent and CLI tools: GitHub CLI, `jq`, `pipx`, the Podman remote client, ripgrep, `rsync`, `time`, and `tmux`, plus the existing build, SSH, Android, USB, and privilege-management tools
 - media and OCR: FFmpeg, fontconfig, ImageMagick, and Tesseract OCR
 - documents and TeX: Ghostscript, Pandoc, `texlive-latex-base`, WeasyPrint, and `xsltproc`
 
