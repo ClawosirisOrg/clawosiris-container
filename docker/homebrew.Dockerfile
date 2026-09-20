@@ -19,18 +19,35 @@ RUN install -d -m 0755 "$HOMEBREW_PREFIX/Homebrew" && \
     ln -s ../Homebrew/bin/brew "$HOMEBREW_PREFIX/bin/brew" && \
     chown -R node:node "$HOMEBREW_PREFIX"
 
+ARG TARGETARCH
+RUN set -eu; \
+    case "${TARGETARCH:-}" in \
+      amd64) \
+        himalaya_arch=x86_64; \
+        himalaya_sha256=683a2ab8e1534f01e6bda3a69e204d564c31fbfbe20511fc7bc60b67f2e85884; \
+        ;; \
+      arm64) \
+        himalaya_arch=aarch64; \
+        himalaya_sha256=c41adab4bc220ba816cdbf865a5df8dc3b358b39ec58b4be0ed2f64e46b1d182; \
+        ;; \
+      *) \
+        echo "ERROR: unsupported TARGETARCH for Himalaya v2.1.0: ${TARGETARCH:-<unset>} (expected amd64 or arm64)" >&2; \
+        exit 1; \
+        ;; \
+    esac; \
+    himalaya_archive="/var/tmp/himalaya.${himalaya_arch}-linux.tgz"; \
+    curl -fsSL \
+      "https://github.com/pimalaya/himalaya/releases/download/v2.1.0/himalaya.${himalaya_arch}-linux.tgz" \
+      -o "$himalaya_archive"; \
+    printf '%s  %s\n' "$himalaya_sha256" "$himalaya_archive" | sha256sum -c -; \
+    tar -xzf "$himalaya_archive" -C /var/tmp himalaya; \
+    install -m 0755 /var/tmp/himalaya /usr/local/bin/himalaya; \
+    rm -f "$himalaya_archive" /var/tmp/himalaya
+
 USER node
 RUN set -eu; \
-    export HOMEBREW_NO_AUTO_UPDATE=1; \
-    export HOMEBREW_CACHE="$HOMEBREW_PREFIX/.cache/Homebrew"; \
-    install -d -m 0755 "$HOMEBREW_CACHE"; \
-    test "$(brew --cache)" = "$HOMEBREW_CACHE"; \
-    brew install himalaya; \
-    test -x "$HOMEBREW_PREFIX/bin/himalaya"; \
-    "$HOMEBREW_PREFIX/bin/himalaya" --version; \
-    rm -rf /home/linuxbrew/.linuxbrew/.cache/Homebrew
-
-RUN set -eu; \
+    test "$(command -v himalaya)" = /usr/local/bin/himalaya && \
+    himalaya --version && \
     printf '%s\n' "$PATH" | tr ':' '\n' | grep -Fx /home/node/.npm-global/bin && \
     brew --version && \
     test "$(brew --prefix)" = "$HOMEBREW_PREFIX" && \
