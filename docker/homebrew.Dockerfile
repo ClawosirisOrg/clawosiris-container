@@ -26,8 +26,8 @@ RUN set -eu; \
     install -d -m 0755 "$HOMEBREW_CACHE"; \
     test "$(brew --cache)" = "$HOMEBREW_CACHE"; \
     brew install himalaya; \
-    test "$(command -v himalaya)" = "$HOMEBREW_PREFIX/bin/himalaya"; \
-    himalaya --version; \
+    test -x "$HOMEBREW_PREFIX/bin/himalaya"; \
+    "$HOMEBREW_PREFIX/bin/himalaya" --version; \
     rm -rf /home/linuxbrew/.linuxbrew/.cache/Homebrew
 
 RUN set -eu; \
