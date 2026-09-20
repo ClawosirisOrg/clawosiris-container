@@ -22,11 +22,13 @@ RUN install -d -m 0755 "$HOMEBREW_PREFIX/Homebrew" && \
 USER node
 RUN set -eu; \
     export HOMEBREW_NO_AUTO_UPDATE=1; \
+    export HOMEBREW_CACHE="$HOMEBREW_PREFIX/.cache/Homebrew"; \
+    install -d -m 0755 "$HOMEBREW_CACHE"; \
+    test "$(brew --cache)" = "$HOMEBREW_CACHE"; \
     brew install himalaya; \
     test "$(command -v himalaya)" = "$HOMEBREW_PREFIX/bin/himalaya"; \
     himalaya --version; \
-    test "$(brew --cache)" = /home/node/.cache/Homebrew; \
-    rm -rf /home/node/.cache/Homebrew/downloads
+    rm -rf /home/linuxbrew/.linuxbrew/.cache/Homebrew
 
 RUN set -eu; \
     printf '%s\n' "$PATH" | tr ':' '\n' | grep -Fx /home/node/.npm-global/bin && \
