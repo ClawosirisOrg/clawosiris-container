@@ -54,6 +54,14 @@ The selected OpenClaw Codex extension already includes its lockfile-pinned `@ope
 
 Codex authentication remains runtime state. Credentials, API keys, access tokens, and login automation are not included in the image.
 
+## Matrix runtime dependencies
+
+When the selected upstream OpenClaw build includes Matrix, its production dependencies can remain under the packaged `/app/dist/extensions/matrix/node_modules` tree or the workspace-style `/app/extensions/matrix/node_modules` tree. Some unified chunks under `/app/dist` import the Matrix SDK packages by bare name, so Node resolves them from `/app/node_modules` instead. The runtime overlay bridges that packaging boundary with relative links for `matrix-js-sdk`, `@matrix-org/matrix-sdk-crypto-nodejs`, and `@matrix-org/matrix-sdk-crypto-wasm`. It uses only the lockfile-installed packages already present in the image and never runs an additional package-manager install.
+
+The compatibility layer is conditional: builds that omit the packaged Matrix dist create no links. Each valid package already exposed at the root is preserved before the overlay considers either fallback tree. If a root package is absent, the overlay prefers the packaged dist tree and then the workspace-style tree; the build fails clearly when neither contains a valid package or when an existing root path or compatibility link is invalid.
+
+Matrix-enabled builds also smoke-test the resulting root resolution from `/app`: the JavaScript SDK must import, the WASM package must resolve, and the native crypto package must contain a non-empty payload for the build architecture and load successfully. Matrix homeserver credentials, access tokens, passwords, device state, encryption keys, and recovery material remain runtime-only state and are never included in the image.
+
 ## Persistent Homebrew Quadlet volume
 
 The files under `quadlet/` extend an existing rootless `openclaw.container` unit without replacing it. Install them for the user that runs OpenClaw:

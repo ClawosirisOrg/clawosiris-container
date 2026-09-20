@@ -70,7 +70,98 @@ RUN set -eu; \
     install -m 0755 "$gog_tmpdir/gog" /usr/local/bin/gog; \
     rm -rf "$gog_archive" "$gog_tmpdir"
 
+# Unified Matrix chunks resolve bare SDK imports from /app/node_modules, while
+# selected-plugin packaging can keep them below extension-specific trees.
+RUN set -eu; \
+    matrix_dist=/app/dist/extensions/matrix; \
+    if [ -d "$matrix_dist" ]; then \
+      ensure_matrix_package() { \
+        matrix_package="$1"; \
+        matrix_dest="$2"; \
+        if [ -L "$matrix_dest" ] && [ ! -e "$matrix_dest" ]; then \
+          echo "ERROR: broken Matrix dependency link: $matrix_dest" >&2; \
+          exit 1; \
+        elif [ -e "$matrix_dest" ]; then \
+          if [ ! -d "$matrix_dest" ] || [ ! -f "$matrix_dest/package.json" ]; then \
+            echo "ERROR: existing Matrix root dependency is invalid: $matrix_dest" >&2; \
+            exit 1; \
+          fi; \
+          return 0; \
+        fi; \
+        matrix_source=""; \
+        matrix_relative_source=""; \
+        if [ -d "$3" ] && [ -f "$3/package.json" ]; then \
+          matrix_source="$3"; \
+          matrix_relative_source="$4"; \
+        elif [ -d "$5" ] && [ -f "$5/package.json" ]; then \
+          matrix_source="$5"; \
+          matrix_relative_source="$6"; \
+        fi; \
+        if [ -z "$matrix_source" ]; then \
+          echo "ERROR: Matrix root dependency $matrix_package is absent and no valid packaged fallback exists at $3 or $5" >&2; \
+          exit 1; \
+        fi; \
+        matrix_dest_parent="${matrix_dest%/*}"; \
+        if [ -L "$matrix_dest_parent" ] && [ ! -e "$matrix_dest_parent" ]; then \
+          echo "ERROR: broken Matrix dependency parent link: $matrix_dest_parent" >&2; \
+          exit 1; \
+        elif [ ! -e "$matrix_dest_parent" ]; then \
+          install -d -m 0755 -o node -g node "$matrix_dest_parent"; \
+        elif [ ! -d "$matrix_dest_parent" ]; then \
+          echo "ERROR: Matrix dependency parent is not a directory: $matrix_dest_parent" >&2; \
+          exit 1; \
+        fi; \
+        ln -s "$matrix_relative_source" "$matrix_dest"; \
+        if [ ! -f "$matrix_dest/package.json" ]; then \
+          echo "ERROR: Matrix dependency link does not resolve through $matrix_dest to $matrix_source" >&2; \
+          exit 1; \
+        fi; \
+      }; \
+      ensure_matrix_package \
+        matrix-js-sdk \
+        /app/node_modules/matrix-js-sdk \
+        /app/dist/extensions/matrix/node_modules/matrix-js-sdk \
+        ../dist/extensions/matrix/node_modules/matrix-js-sdk \
+        /app/extensions/matrix/node_modules/matrix-js-sdk \
+        ../extensions/matrix/node_modules/matrix-js-sdk; \
+      ensure_matrix_package \
+        @matrix-org/matrix-sdk-crypto-nodejs \
+        /app/node_modules/@matrix-org/matrix-sdk-crypto-nodejs \
+        /app/dist/extensions/matrix/node_modules/@matrix-org/matrix-sdk-crypto-nodejs \
+        ../../dist/extensions/matrix/node_modules/@matrix-org/matrix-sdk-crypto-nodejs \
+        /app/extensions/matrix/node_modules/@matrix-org/matrix-sdk-crypto-nodejs \
+        ../../extensions/matrix/node_modules/@matrix-org/matrix-sdk-crypto-nodejs; \
+      ensure_matrix_package \
+        @matrix-org/matrix-sdk-crypto-wasm \
+        /app/node_modules/@matrix-org/matrix-sdk-crypto-wasm \
+        /app/dist/extensions/matrix/node_modules/@matrix-org/matrix-sdk-crypto-wasm \
+        ../../dist/extensions/matrix/node_modules/@matrix-org/matrix-sdk-crypto-wasm \
+        /app/extensions/matrix/node_modules/@matrix-org/matrix-sdk-crypto-wasm \
+        ../../extensions/matrix/node_modules/@matrix-org/matrix-sdk-crypto-wasm; \
+    fi
+
 USER node
+RUN set -eu; \
+    if [ -d /app/dist/extensions/matrix ]; then \
+      cd /app; \
+      node --input-type=module -e 'await import("matrix-js-sdk/lib/matrix.js")'; \
+      crypto_nodejs_dir="$(node -p 'require("node:path").dirname(require.resolve("@matrix-org/matrix-sdk-crypto-nodejs"))')"; \
+      case "$(node -p 'process.arch')" in \
+        x64) crypto_arch=x64 ;; \
+        arm64) crypto_arch=arm64 ;; \
+        *) \
+          echo "ERROR: unsupported architecture for Matrix native crypto: $(node -p 'process.arch')" >&2; \
+          exit 1; \
+          ;; \
+      esac; \
+      crypto_binding="$crypto_nodejs_dir/matrix-sdk-crypto.linux-${crypto_arch}-gnu.node"; \
+      if [ ! -s "$crypto_binding" ]; then \
+        echo "ERROR: Matrix native crypto payload is missing or empty: $crypto_binding" >&2; \
+        exit 1; \
+      fi; \
+      node -e 'require("@matrix-org/matrix-sdk-crypto-nodejs")'; \
+      node -e 'require.resolve("@matrix-org/matrix-sdk-crypto-wasm")'; \
+    fi
 RUN set -eu; \
     test "$(command -v himalaya)" = /usr/local/bin/himalaya && \
     himalaya --version && \
