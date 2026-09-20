@@ -44,10 +44,40 @@ RUN set -eu; \
     install -m 0755 /var/tmp/himalaya /usr/local/bin/himalaya; \
     rm -f "$himalaya_archive" /var/tmp/himalaya
 
+RUN set -eu; \
+    case "${TARGETARCH:-}" in \
+      amd64) \
+        gog_sha256=5f73815950f30de4165b7b767103ca45c4950e84a1da601eda5294e9ff94f767; \
+        ;; \
+      arm64) \
+        gog_sha256=21ca9757f67a573115b517854184561cef6b3b73c21e0f60c72229522c7198ac; \
+        ;; \
+      *) \
+        echo "ERROR: unsupported TARGETARCH for gogcli v0.40.0: ${TARGETARCH:-<unset>} (expected amd64 or arm64)" >&2; \
+        exit 1; \
+        ;; \
+    esac; \
+    gog_archive="/var/tmp/gogcli_0.40.0_linux_${TARGETARCH}.tar.gz"; \
+    gog_tmpdir=/var/tmp/gogcli-install; \
+    rm -rf "$gog_tmpdir"; \
+    install -d -m 0755 "$gog_tmpdir"; \
+    curl -fsSL \
+      "https://github.com/openclaw/gogcli/releases/download/v0.40.0/gogcli_0.40.0_linux_${TARGETARCH}.tar.gz" \
+      -o "$gog_archive"; \
+    printf '%s  %s\n' "$gog_sha256" "$gog_archive" | sha256sum -c -; \
+    tar -xzf "$gog_archive" -C "$gog_tmpdir" \
+      --no-same-owner --no-same-permissions ./gog; \
+    install -m 0755 "$gog_tmpdir/gog" /usr/local/bin/gog; \
+    rm -rf "$gog_archive" "$gog_tmpdir"
+
 USER node
 RUN set -eu; \
     test "$(command -v himalaya)" = /usr/local/bin/himalaya && \
     himalaya --version && \
+    test "$(command -v gog)" = /usr/local/bin/gog && \
+    gog --version && \
+    test -f /app/skills/gog/SKILL.md && \
+    awk 'NR == 1 { if ($0 != "---") exit 1; next } $0 == "---" { closed = 1; exit found ? 0 : 1 } $0 ~ /^name:[[:space:]]*gog[[:space:]]*$/ { found = 1 } END { if (!found || !closed) exit 1 }' /app/skills/gog/SKILL.md && \
     printf '%s\n' "$PATH" | tr ':' '\n' | grep -Fx /home/node/.npm-global/bin && \
     brew --version && \
     test "$(brew --prefix)" = "$HOMEBREW_PREFIX" && \
