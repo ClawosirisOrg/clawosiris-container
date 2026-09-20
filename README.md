@@ -28,13 +28,15 @@ The default Debian packages provide native coverage for:
 
 Debian Bookworm's ImageMagick 6 provides `convert`-style tools, but it is not a drop-in replacement for Homebrew ImageMagick 7's `magick` command. Likewise, `texlive-latex-base` provides basic LaTeX capability rather than parity with the full 4.8 GB Homebrew TeX Live installation.
 
-The following tools are intentionally not treated as native-equivalent in Bookworm: Go (Bookworm 1.19 is materially older than the current toolchain), `yt-dlp` (the Bookworm package is from 2023), `himalaya`, `gog`, `summarize`, `gifgrep`, `tectonic`, `uv`, Deno, and `signal-cli`.
+The following tools are intentionally not treated as native-equivalent in Bookworm: Go (Bookworm 1.19 is materially older than the current toolchain), `yt-dlp` (the Bookworm package is from 2023), `gog`, `summarize`, `gifgrep`, `tectonic`, `uv`, Deno, and `signal-cli`. Himalaya is installed separately from its upstream release.
 
 ## Homebrew layer
 
 The image includes only the Homebrew package manager, installed at the standard Linux prefix `/home/linuxbrew/.linuxbrew`. The build pins Homebrew to commit `9e9f316db6990631c097d48a792caf8645a4129e` (Homebrew 6.0.14), disables analytics, and leaves the entire prefix writable by the runtime `node` user. No formulae are preinstalled.
 
 The runtime `node` user's global Node package binary directory, the app-root and Codex extension-local pnpm binary directories, and Homebrew's `bin` and `sbin` directories are appended to `PATH`, in that order. Debian and `/usr/local` executables therefore keep precedence. User-global apps in `/home/node/.npm-global/bin` take precedence over bundled production-dependency executables, while Homebrew-installed commands fill remaining gaps in the native tool set.
+
+Himalaya v2.1.0 is installed from its checksum-verified upstream release asset at `/usr/local/bin/himalaya` for amd64 and arm64 images. Because `/usr/local/bin` precedes the appended Homebrew paths, the image-owned binary takes precedence over any same-named Homebrew formula. Himalaya account credentials and account configuration are runtime-only and are not included in the image.
 
 Both workflows run `scripts/prepare-dockerfile.sh` after checking out OpenClaw. The script appends the tracked `docker/homebrew.Dockerfile` layer to the selected upstream Dockerfile and writes `openclaw/Dockerfile.clawosiris`, which is the file passed to Buildx.
 
@@ -59,7 +61,7 @@ systemctl --user restart openclaw.service
 
 The drop-in references `openclaw-homebrew.volume` directly, so Quadlet creates the named volume and orders the generated services correctly. It mounts the volume at `/home/linuxbrew/.linuxbrew`. The mount deliberately does not use `nocopy`: on its first use, Podman's default copy-up seeds an empty volume with the pinned Homebrew installation and ownership from the image. Formulae installed later with `brew install` remain in that volume across container recreation and image upgrades.
 
-An existing volume also keeps its current Homebrew checkout when the image changes. Upgrade that persistent installation explicitly with `brew update` and upgrade formulae when desired with `brew upgrade`; the container does not run either command at startup. To adopt a newer image seed instead, stop `openclaw.service`, run `podman volume rm openclaw-homebrew`, and start the service again. Removing the volume permanently removes every formula and other on-demand change in it; the next first mount reseeds only the Homebrew package manager from the image.
+An existing volume also keeps its current Homebrew checkout and installed formulae when the image changes. Himalaya is installed outside this mount at `/usr/local/bin/himalaya`, so persistent Homebrew volumes neither contain nor control the image-owned binary. Upgrade the persistent Homebrew installation explicitly with `brew update` and `brew upgrade` when desired; the container does not run those commands at startup. To adopt a newer Homebrew image seed instead, stop `openclaw.service`, run `podman volume rm openclaw-homebrew`, and start the service again. Removing the volume permanently removes every formula and other on-demand change in it; the next first mount reseeds only the pinned Homebrew package manager from the image.
 
 ## Workflows
 
