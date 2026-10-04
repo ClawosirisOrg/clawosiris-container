@@ -50,13 +50,13 @@ Build and test locally:
     # Optional live egress test (public GitHub availability required):
     SANDBOX_LIVE_GITHUB=1 sh scripts/smoke-sandbox.sh localhost/sandbox-base:test base
 
-The smoke defaults to UID 123456. On rootless Podman with a smaller subordinate-ID mapping, set SANDBOX_TEST_UID=65532 for smoke runs (the GitHub Docker runners use 123456).
+The image and smoke default to the deployed OpenClaw UID/GID `1556100503`, with a matching passwd/group entry for NSS-dependent clients. For another runtime UID, build both targets with `--build-arg SANDBOX_UID=<uid>` and run the smoke with `SANDBOX_TEST_UID=<uid>`. On this rootless Podman host, local smoke uses `SANDBOX_TEST_UID=65532` because its subordinate-ID mapping cannot run the configured UID; CI Docker runners test the actual configured UID.
 
-At runtime, the caller must enforce the security boundary: arbitrary unprivileged UID, read-only root filesystem, dropped capabilities, no-new-privileges, narrow tmpfs and only explicitly mounted workspaces. Use --network none by default. The smoke script checks versions, writable `/workspace`, root write denial and attempted egress at UID 123456 with network none, then checks named-bridge container DNS without external dependencies. It disables Corepack network fetches; CLI availability does not imply a populated offline dependency store. Opt-in read-only git ls-remote checks GitHub egress; it is not a CI gate because public service availability is not deterministic. The image itself is **not** a security boundary; engine isolation and mount/network choices are. A bridge grants network access and should be explicitly authorized.
+At runtime, the caller must enforce the security boundary: the configured unprivileged UID, read-only root filesystem, dropped capabilities, no-new-privileges, narrow tmpfs and only explicitly mounted workspaces. Use --network none by default. The smoke script checks versions, writable `/workspace`, root write denial and attempted egress at the configured UID with network none, then checks named-bridge container DNS without external dependencies. It disables Corepack network fetches; CLI availability does not imply a populated offline dependency store. Opt-in read-only git ls-remote checks GitHub egress; it is not a CI gate because public service availability is not deterministic. The image itself is **not** a security boundary; engine isolation and mount/network choices are. A bridge grants network access and should be explicitly authorized.
 
 Example locked-down shell:
 
-    podman run --rm -it --user 123456:123456 --read-only --network none \
+    podman run --rm -it --user 1556100503:1556100503 --read-only --network none \
       --cap-drop=ALL --security-opt=no-new-privileges \
       --tmpfs /tmp:rw,nosuid,nodev,size=64m,mode=1777 -e HOME=/tmp \
       ghcr.io/clawosirisorg/sandbox:node24-bookworm-1.0.0 /bin/sh

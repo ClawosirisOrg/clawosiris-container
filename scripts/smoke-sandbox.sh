@@ -3,7 +3,7 @@ set -eu
 image=$1
 flavor=$2
 engine=${ENGINE:-podman}
-uid=${SANDBOX_TEST_UID:-123456}
+uid=${SANDBOX_TEST_UID:-1556100503}
 if [ -z "$image" ] || [ -z "$flavor" ]; then echo "usage: $0 IMAGE base|node24" >&2; exit 2; fi
 case "$flavor" in base|node24) ;; *) echo "unknown flavor: $flavor" >&2; exit 2 ;; esac
 command -v "$engine" >/dev/null

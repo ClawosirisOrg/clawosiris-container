@@ -13,14 +13,20 @@ RUN set -eu; \
       ca-certificates curl gh git openssh-client jq; \
     rm -rf /var/lib/apt/lists/*
 
-# Caller supplies arbitrary unprivileged UID, writable tmpfs and workspace.
+# Match the configured OpenClaw sandbox UID so NSS-dependent clients work.
+# Other deployments may override this build arg and must use the same runtime UID.
+ARG SANDBOX_UID=1556100503
+RUN set -eu; \
+    printf 'sandbox:x:%s:%s:Sandbox user:/tmp:/bin/sh\n' "$SANDBOX_UID" "$SANDBOX_UID" >> /etc/passwd; \
+    printf 'sandbox:x:%s:\n' "$SANDBOX_UID" >> /etc/group
 ENV HOME=/tmp GIT_CONFIG_NOSYSTEM=1
 WORKDIR /tmp
-USER 65532:65532
+USER $SANDBOX_UID:$SANDBOX_UID
 CMD ["/bin/sh"]
 
 FROM docker.io/library/node:24.19.0-bookworm-slim@sha256:a9f5f7c91a432850b2a8a7797adf5eadb6c733ceed61167806cee7ea7fbc29df AS node-source
 FROM sandbox-base AS sandbox-node24
+ARG SANDBOX_UID=1556100503
 USER root
 COPY --from=node-source /usr/local/ /usr/local/
 ARG TARGETARCH
@@ -38,4 +44,4 @@ RUN set -eu; \
     rm -rf /tmp/pnpm.tar.gz /tmp/pnpm-extract; \
     test "$(node --version)" = v24.19.0; \
     test "$(pnpm --version)" = 12.5.0
-USER 65532:65532
+USER $SANDBOX_UID:$SANDBOX_UID
