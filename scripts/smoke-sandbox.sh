@@ -18,7 +18,7 @@ run_sandbox() {
     --env GIT_TERMINAL_PROMPT=0 --env SANDBOX_TEST_UID="$uid" \
     --entrypoint /bin/sh "$@"
 }
-if run_sandbox --network none "$image" -ec '
+if output=$(run_sandbox --network none "$image" -ec '
   test "$(id -u)" = "$SANDBOX_TEST_UID"
   touch /workspace/sandbox-write-probe; rm /workspace/sandbox-write-probe
   gh --version >/dev/null; git --version; ssh -V; jq --version
@@ -27,8 +27,13 @@ if run_sandbox --network none "$image" -ec '
   if timeout 12 git ls-remote https://github.com/git/git.git HEAD >/dev/null 2>&1; then
     echo "network-none unexpectedly reached GitHub" >&2; exit 1
   fi
-'; then :; else
-  status=$?; echo "::error title=offline sandbox smoke::exit $status"; exit "$status"
+' 2>&1); then
+  printf '%s\n' "$output"
+else
+  status=$?
+  detail=$(printf '%s' "$output" | tr '\n' ' ' | cut -c1-400 | sed 's/%/%25/g')
+  echo "::error title=offline sandbox smoke::exit $status; $detail"
+  exit "$status"
 fi
 # Root itself must also be unable to write the read-only image layer.
 if "$engine" run --rm --user 0:0 --read-only --network none \
