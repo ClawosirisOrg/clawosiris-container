@@ -30,6 +30,39 @@ Debian Bookworm's ImageMagick 6 provides `convert`-style tools, but it is not a 
 
 The following tools are intentionally not treated as native-equivalent in Bookworm: Go (Bookworm 1.19 is materially older than the current toolchain), `yt-dlp` (the Bookworm package is from 2023), `summarize`, `gifgrep`, `tectonic`, `uv`, Deno, and `signal-cli`. Himalaya and gog are installed separately from their upstream releases.
 
+## Sandbox images
+
+Independent of the OpenClaw application image, docker/sandbox.Dockerfile builds:
+
+| Target | GHCR multi-arch tag (1.0.0 example) | Contents |
+| --- | --- | --- |
+| sandbox-base | ghcr.io/clawosirisorg/sandbox:base-bookworm-1.0.0 | Debian Bookworm, gh, git, openssh-client, jq, CA roots, curl |
+| sandbox-node24 | ghcr.io/clawosirisorg/sandbox:node24-bookworm-1.0.0 | Base plus Node 24.19.0 and pnpm 12.5.0 |
+
+Release also produces tags with -amd64 and -arm64 suffixes. Base and Node source use pinned multi-architecture image-index digests; Debian packages resolve from signed 20261001T000000Z Bookworm snapshots (including security and updates); pnpm release archives are checked with architecture-specific SHA-256. Bump pins deliberately for security updates. The manual sandbox-release.yml accepts MAJOR.MINOR.PATCH and an optional lowercase prerelease suffix; it builds and smokes both native architectures before pushing them and assembling manifests. sandbox-validate.yml runs the same smoke on PRs and main. Neither workflow changes the existing OpenClaw image path.
+
+Build and test locally:
+
+    podman build -f docker/sandbox.Dockerfile --target sandbox-base -t localhost/sandbox-base:test .
+    podman build -f docker/sandbox.Dockerfile --target sandbox-node24 -t localhost/sandbox-node24:test .
+    sh scripts/smoke-sandbox.sh localhost/sandbox-base:test base
+    sh scripts/smoke-sandbox.sh localhost/sandbox-node24:test node24
+    # Optional live egress test (public GitHub availability required):
+    SANDBOX_LIVE_GITHUB=1 sh scripts/smoke-sandbox.sh localhost/sandbox-base:test base
+
+The smoke defaults to UID 123456. On rootless Podman with a smaller subordinate-ID mapping, set SANDBOX_TEST_UID=65532 for smoke runs (the GitHub Docker runners use 123456).
+
+At runtime, the caller must enforce the security boundary: arbitrary unprivileged UID, read-only root filesystem, dropped capabilities, no-new-privileges, narrow tmpfs and only explicitly mounted workspaces. Use --network none by default. The smoke script checks versions, writable `/workspace`, root write denial and attempted egress at UID 123456 with network none, then checks named-bridge container DNS without external dependencies. It disables Corepack network fetches; CLI availability does not imply a populated offline dependency store. Opt-in read-only git ls-remote checks GitHub egress; it is not a CI gate because public service availability is not deterministic. The image itself is **not** a security boundary; engine isolation and mount/network choices are. A bridge grants network access and should be explicitly authorized.
+
+Example locked-down shell:
+
+    podman run --rm -it --user 123456:123456 --read-only --network none \
+      --cap-drop=ALL --security-opt=no-new-privileges \
+      --tmpfs /tmp:rw,nosuid,nodev,size=64m,mode=1777 -e HOME=/tmp \
+      ghcr.io/clawosirisorg/sandbox:node24-bookworm-1.0.0 /bin/sh
+
+No credentials, tokens, SSH private keys or account configuration are copied into either image or passed by the smoke script. For Git writes, use a dedicated repository-scoped SSH identity; for GitHub API actions, use a broker outside the sandbox. Do not inject a shared `GITHUB_TOKEN`, mount the host home, container socket or SSH agent into an untrusted sandbox. These images contain tools, not OpenClaw itself.
+
 ## Homebrew layer
 
 The image includes only the Homebrew package manager, installed at the standard Linux prefix `/home/linuxbrew/.linuxbrew`. The build pins Homebrew to commit `9e9f316db6990631c097d48a792caf8645a4129e` (Homebrew 6.0.14), disables analytics, and leaves the entire prefix writable by the runtime `node` user. No formulae are preinstalled.
