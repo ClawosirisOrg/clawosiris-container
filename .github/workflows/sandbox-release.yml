@@ -1,0 +1,101 @@
+name: Release Sandbox Images
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_tag:
+        description: Version suffix, e.g. 1.0.0 (both variants, both architectures)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: sandbox-release-${{ inputs.version_tag }}
+  cancel-in-progress: false
+
+env:
+  IMAGE: ghcr.io/clawosirisorg/sandbox
+  VERSION: ${{ inputs.version_tag }}
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {flavor: base, target: sandbox-base, arch: amd64, runner: ubuntu-latest, platform: linux/amd64}
+          - {flavor: base, target: sandbox-base, arch: arm64, runner: ubuntu-24.04-arm, platform: linux/arm64}
+          - {flavor: node24, target: sandbox-node24, arch: amd64, runner: ubuntu-latest, platform: linux/amd64}
+          - {flavor: node24, target: sandbox-node24, arch: arm64, runner: ubuntu-24.04-arm, platform: linux/arm64}
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Check version suffix
+        run: |
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-z0-9.-]+)?$ ]] || exit 2
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build testable image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/sandbox.Dockerfile
+          target: ${{ matrix.target }}
+          platforms: ${{ matrix.platform }}
+          load: true
+          tags: sandbox-test:${{ matrix.flavor }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+      - name: Security and tool smoke
+        env:
+          ENGINE: docker
+        run: sh scripts/smoke-sandbox.sh sandbox-test:${{ matrix.flavor }} ${{ matrix.flavor }}
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GHCR_TOKEN || secrets.GITHUB_TOKEN }}
+      - name: Push tested architecture
+        env:
+          FLAVOR: ${{ matrix.flavor }}
+          ARCH: ${{ matrix.arch }}
+        run: |
+          tag="$IMAGE:$FLAVOR-bookworm-$VERSION-$ARCH"
+          if docker buildx imagetools inspect "$tag" >/dev/null 2>&1; then
+            echo "Refusing to overwrite existing tag: $tag" >&2
+            exit 1
+          fi
+          docker tag "sandbox-test:$FLAVOR" "$tag"
+          docker push "$tag"
+
+  manifest:
+    needs: build
+    strategy:
+      matrix:
+        flavor: [base, node24]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check version suffix
+        run: |
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-z0-9.-]+)?$ ]] || exit 2
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GHCR_TOKEN || secrets.GITHUB_TOKEN }}
+      - name: Publish amd64+arm64 manifest
+        env:
+          FLAVOR: ${{ matrix.flavor }}
+        run: |
+          tag="$IMAGE:$FLAVOR-bookworm-$VERSION"
+          if docker buildx imagetools inspect "$tag" >/dev/null 2>&1; then
+            echo "Refusing to overwrite existing tag: $tag" >&2
+            exit 1
+          fi
+          docker buildx imagetools create -t "$tag" "$tag-amd64" "$tag-arm64"
+          docker buildx imagetools inspect "$tag"

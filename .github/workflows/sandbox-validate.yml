@@ -1,0 +1,61 @@
+name: Validate Sandbox Images
+
+on:
+  pull_request:
+    paths:
+      - docker/sandbox.Dockerfile
+      - scripts/smoke-sandbox.sh
+      - .github/workflows/sandbox-validate.yml
+      - .github/workflows/sandbox-release.yml
+      - README.md
+  push:
+    branches: [main]
+    paths:
+      - docker/sandbox.Dockerfile
+      - scripts/smoke-sandbox.sh
+      - .github/workflows/sandbox-validate.yml
+      - .github/workflows/sandbox-release.yml
+      - README.md
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sandbox:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {arch: amd64, runner: ubuntu-latest, platform: linux/amd64}
+          - {arch: arm64, runner: ubuntu-24.04-arm, platform: linux/arm64}
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build base
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/sandbox.Dockerfile
+          target: sandbox-base
+          platforms: ${{ matrix.platform }}
+          load: true
+          tags: sandbox-base:test
+      - name: Smoke base
+        env:
+          ENGINE: docker
+        run: sh scripts/smoke-sandbox.sh sandbox-base:test base
+      - name: Build Node variant
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/sandbox.Dockerfile
+          target: sandbox-node24
+          platforms: ${{ matrix.platform }}
+          load: true
+          tags: sandbox-node24:test
+      - name: Smoke Node variant
+        env:
+          ENGINE: docker
+        run: sh scripts/smoke-sandbox.sh sandbox-node24:test node24
