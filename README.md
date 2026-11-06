@@ -95,15 +95,48 @@ The compatibility layer is conditional: builds that omit the packaged Matrix dis
 
 Matrix-enabled builds also smoke-test the resulting root resolution from `/app`: the JavaScript SDK must import, the WASM package must resolve, and the native crypto package must contain a non-empty payload for the build architecture and load successfully. Matrix homeserver credentials, access tokens, passwords, device state, encryption keys, and recovery material remain runtime-only state and are never included in the image.
 
-## Persistent Homebrew Quadlet volume
+## Rootless Quadlet drop-ins
 
-The files under `quadlet/` extend an existing rootless `openclaw.container` unit without replacing it. Install them for the user that runs OpenClaw:
+The files under `quadlet/` extend an existing rootless `openclaw.container` unit; they do not provide a complete deployment-specific container definition. Install and operate them as the same host user that owns the existing unit. That user needs a working rootless Podman and systemd user manager with Quadlet support. The base unit must already be installed at `~/.config/containers/systemd/openclaw.container` and configured so the container process can write the bind-mounted state directories.
+
+Each capability is installed explicitly. The normal state and Homebrew drop-ins are under `quadlet/openclaw.container.d/`. The privileged Podman socket drop-in is physically separate under `quadlet/optional-podman-socket/`, so none of the normal installation commands grant socket access.
+
+### State and cache paths
+
+Install the normal state-path drop-in and create its host directories before restarting OpenClaw:
 
 ```sh
-mkdir -p ~/.config/containers/systemd/openclaw.container.d
-cp quadlet/openclaw-homebrew.volume ~/.config/containers/systemd/
-cp quadlet/openclaw.container.d/10-homebrew-volume.conf \
-  ~/.config/containers/systemd/openclaw.container.d/
+install -d "$HOME/.config/containers/systemd/openclaw.container.d"
+install -d "$HOME/.openclaw" "$HOME/.openclaw/.npm" "$HOME/.cache"
+install -m 0644 quadlet/openclaw.container.d/20-state-path.conf \
+  "$HOME/.config/containers/systemd/openclaw.container.d/"
+systemctl --user daemon-reload
+systemctl --user restart openclaw.service
+systemctl --user status openclaw.service --no-pager
+```
+
+The drop-in uses systemd user-manager specifiers rather than a deployment-specific account: `%h` expands to that user's home directory. It bind-mounts `%h/.openclaw` and `%h/.cache` at the same paths inside the container, sets `HOME=%h`, and places npm's cache at `%h/.openclaw/.npm`. State and cache paths therefore remain stable across container recreation without baking a host user name into the repository.
+
+Changing `HOME` also changes where applications look for `.cache`. The writable `%h/.cache` bind is required alongside the `HOME` override: without it, the container may repeatedly fail to create or write its cache beneath the new home and `openclaw.service` can enter a startup/restart loop. If that happens, confirm all three host directories exist and are writable by the container's configured user mapping, then inspect the logs:
+
+```sh
+journalctl --user -u openclaw.service -n 100 --no-pager
+```
+
+Both directory mounts end in `:Z`. On SELinux systems, Podman privately relabels those host paths for this container. Do not use these private paths as shared storage for another confined container; the most recent private relabel can remove the earlier container's access. The relabel changes labels on the host directories, so review local SELinux and backup policy before installation.
+
+To update the drop-in, copy the new version over the installed file, run `systemctl --user daemon-reload`, and restart the service. Removing the installed drop-in and reloading/restarting stops the binds and restores the base unit's `HOME`; it does not delete the host's `.openclaw`, npm cache, or `.cache` contents.
+
+### Persistent Homebrew volume
+
+Homebrew persistence remains a separate optional capability. Install its named volume and drop-in for the user that runs OpenClaw:
+
+```sh
+install -d "$HOME/.config/containers/systemd/openclaw.container.d"
+install -m 0644 quadlet/openclaw-homebrew.volume \
+  "$HOME/.config/containers/systemd/"
+install -m 0644 quadlet/openclaw.container.d/10-homebrew-volume.conf \
+  "$HOME/.config/containers/systemd/openclaw.container.d/"
 systemctl --user daemon-reload
 systemctl --user restart openclaw.service
 ```
@@ -112,7 +145,56 @@ The drop-in references `openclaw-homebrew.volume` directly, so Quadlet creates t
 
 An existing volume also keeps its current Homebrew checkout and installed formulae when the image changes. Himalaya and gog are installed outside this mount at `/usr/local/bin/himalaya` and `/usr/local/bin/gog`, so persistent Homebrew volumes neither contain nor control either image-owned binary. The bundled gog skill is also outside the mount at `/app/skills/gog/SKILL.md`. Upgrade the persistent Homebrew installation explicitly with `brew update` and `brew upgrade` when desired; the container does not run those commands at startup. To adopt a newer Homebrew image seed instead, stop `openclaw.service`, run `podman volume rm openclaw-homebrew`, and start the service again. Removing the volume permanently removes every formula and other on-demand change in it; the next first mount reseeds only the pinned Homebrew package manager from the image.
 
+### Optional rootless Podman socket
+
+Socket access is optional and highly privileged. It effectively grants the OpenClaw workload control over every container, image, volume, and mounted data available to the host user running `podman.socket`. It is not a sandbox or a safe privilege boundary and is inappropriate for untrusted agents, prompts, tools, or workloads. Do not install this drop-in unless that trust decision is acceptable.
+
+The image contains Podman's remote client, but the host user socket is not enabled or mounted automatically. Enable the rootless socket for the same user that owns `openclaw.container`, then verify it is listening:
+
+```sh
+systemctl --user enable --now podman.socket
+systemctl --user status podman.socket --no-pager
+```
+
+Install only the explicitly optional socket drop-in:
+
+```sh
+install -d "$HOME/.config/containers/systemd/openclaw.container.d"
+install -m 0644 \
+  quadlet/optional-podman-socket/openclaw.container.d/30-podman-socket.conf \
+  "$HOME/.config/containers/systemd/openclaw.container.d/"
+systemctl --user daemon-reload
+systemctl --user restart openclaw.service
+systemctl --user status openclaw.service --no-pager
+journalctl --user -u openclaw.service -n 100 --no-pager
+```
+
+The generated service requires and starts after `podman.socket`. The drop-in mounts the rootless socket from `%t/podman/podman.sock` to `/run/podman/podman.sock` read/write and sets both `CONTAINER_HOST` and `DOCKER_HOST` to `unix:///run/podman/podman.sock`. `%t` is the user manager's runtime directory, normally `/run/user/<uid>`; no fixed UID is required.
+
+The socket mount deliberately sets `SecurityLabelDisable=true`, disabling SELinux separation for the entire OpenClaw container. This is an explicit part of the privileged integration, not a substitute for the `:Z` state-directory labels and not a security boundary.
+
+After restart, list the rootless containers, select the generated OpenClaw container name, and verify the remote client from inside it:
+
+```sh
+podman ps --format '{{.Names}}'
+OPENCLAW_CONTAINER=systemd-openclaw
+podman exec "$OPENCLAW_CONTAINER" podman --remote info
+```
+
+Replace `systemd-openclaw` if the base Quadlet sets a different container name. The final command must report the host user's Podman service rather than a local in-container engine.
+
+To revoke access, remove `30-podman-socket.conf` from the installed drop-in directory, run `systemctl --user daemon-reload`, and restart `openclaw.service`. Disable `podman.socket` with `systemctl --user disable --now podman.socket` only if no other user services or tools depend on it.
+
+Validate every tracked Quadlet snippet locally with no project-specific runtime dependencies:
+
+```sh
+sh scripts/validate-quadlet.sh
+```
+
 ## Workflows
+
+- `quadlet-validate.yml`
+  Validates Quadlet units and drop-ins on relevant pull requests and pushes to `main`.
 
 - `validate.yml`
   Runs a build-only validation job on pull requests and pushes to `main`.
