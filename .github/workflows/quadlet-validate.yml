@@ -1,0 +1,32 @@
+name: Validate Quadlet snippets
+
+on:
+  pull_request:
+    paths:
+      - "quadlet/**"
+      - "scripts/validate-quadlet.sh"
+      - ".github/workflows/quadlet-validate.yml"
+      - "README.md"
+  push:
+    branches:
+      - main
+    paths:
+      - "quadlet/**"
+      - "scripts/validate-quadlet.sh"
+      - ".github/workflows/quadlet-validate.yml"
+      - "README.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate Quadlet snippets
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate Quadlet snippets
+        run: sh scripts/validate-quadlet.sh
