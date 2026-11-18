@@ -18,7 +18,7 @@ on:
         default: false
         type: boolean
       openclaw_install_browser:
-        description: Set to true to pass OPENCLAW_INSTALL_BROWSER
+        description: Install Chromium (maps to OPENCLAW_INSTALL_BROWSER=1)
         required: true
         default: true
         type: boolean
@@ -96,6 +96,6 @@ jobs:
             io.clawosiris.openclaw.ref=${{ inputs.openclaw_ref }}
             io.clawosiris.openclaw.sha=${{ steps.source.outputs.sha }}
           build-args: |
-            OPENCLAW_INSTALL_BROWSER=${{ inputs.openclaw_install_browser }}
+            OPENCLAW_INSTALL_BROWSER=${{ inputs.openclaw_install_browser && '1' || '0' }}
             OPENCLAW_DOCKER_APT_PACKAGES=${{ inputs.openclaw_docker_apt_packages }}
             OPENCLAW_EXTENSIONS=${{ inputs.openclaw_extensions }}
